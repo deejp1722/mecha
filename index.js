@@ -43,18 +43,19 @@ export default {
           });
         }
 
-        const info = await youtube.getBasicInfo(videoId);
+        // Coba ambil info video menggunakan youtubei.js dengan aman
         let streamUrl = '';
         try {
+          const info = await youtube.getBasicInfo(videoId);
           const format = info.chooseFormat({ type: 'video', quality: '360p', format: 'any' });
           streamUrl = format.url;
-        } catch (_e) {
-          const formats = info.streaming_data?.formats || info.streaming_data?.adaptive_formats || [];
-          if (formats.length > 0) streamUrl = formats[0].url;
+        } catch (innerErr) {
+          // Fallback cerdas: Jika youtubei.js diblokir, ambil langsung dari redirect publik
+          streamUrl = `https://piped.video/latest_version?id=${videoId}&itag=18`;
         }
 
         if (!streamUrl) {
-          return new Response(JSON.stringify({ ok: false, error: 'Gagal mendapatkan URL stream' }), {
+          return new Response(JSON.stringify({ ok: false, error: 'Stream URL tidak ditemukan' }), {
             status: 500,
             headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
           });
@@ -65,7 +66,8 @@ export default {
 
         const ytResponse = await fetch(streamUrl, {
           headers: fetchHeaders,
-          method: 'GET'
+          method: 'GET',
+          redirect: 'follow'
         });
 
         const resHeaders = new Headers(ytResponse.headers);
