@@ -20,12 +20,12 @@ export default {
         const query = url.searchParams.get('q') || 'Nogizaka46';
         const searchResults = await youtube.search(query);
         
-        const items = searchResults.results.map(v => ({
+        const items = (searchResults.results || []).map(v => ({
           id: v.id,
-          title: v.title?.text,
-          channel: v.author?.name,
-          thumbnail: v.thumbnails?.[0]?.url,
-          duration: v.duration?.text
+          title: v.title?.text || v.title,
+          channel: v.author?.name || v.author,
+          thumbnail: v.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
+          duration: v.duration?.text || ''
         })).filter(v => v.id);
 
         return new Response(JSON.stringify({ ok: true, items }), {
@@ -43,10 +43,25 @@ export default {
         }
 
         const info = await youtube.getBasicInfo(videoId);
-        // Coba ambil format muxed mp4 atau format apa saja yang tersedia
-        const format = info.chooseFormat({ type: 'video', quality: 'any', format: 'any' });
+        
+        // Ambil URL streaming langsung dari format yang tersedia
+        let streamUrl = '';
+        try {
+          const format = info.chooseFormat({ type: 'video', quality: 'any', format: 'any' });
+          streamUrl = format.url;
+        } catch (_e) {
+          // Fallback jika chooseFormat gagal, ambil dari streaming_data langsung
+          const formats = info.streaming_data?.formats || info.streaming_data?.adaptive_formats || [];
+          if (formats.length > 0) {
+            streamUrl = formats[0].url;
+          }
+        }
 
-        return new Response(JSON.stringify({ ok: true, url: format.url }), {
+        if (!streamUrl) {
+          throw new Error('Gagal mengekstrak URL stream dari video ini');
+        }
+
+        return new Response(JSON.stringify({ ok: true, url: streamUrl }), {
           headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         });
       }
