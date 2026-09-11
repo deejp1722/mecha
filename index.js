@@ -3,22 +3,17 @@ import html from './indddex.html';
 
 export default {
   async fetch(request, env, ctx) {
-    // Benteng pengaman utama: Pastikan SEMUA error berbuah JSON, bukan HTML Cloudflare!
+    const url = new URL(request.url);
+
+    if (url.pathname === '/') {
+      return new Response(html, { headers: { 'content-type': 'text/html;charset=UTF-8' } });
+    }
+
     try {
-      const url = new URL(request.url);
-
-      if (url.pathname === '/') {
-        return new Response(html, {
-          headers: { 'content-type': 'text/html;charset=UTF-8' },
-        });
-      }
-
-      const youtube = await Innertube.create({
-        client: 'ANDROID',
-        fetch: (input, init) => fetch(input, init)
-      });
-
       if (url.pathname === '/search') {
+        // Buat instance baru untuk setiap request agar tidak ada cache macet
+        const youtube = await Innertube.create({ fetch: (input, init) => fetch(input, init) });
+        
         const query = url.searchParams.get('q') || 'Nogizaka46';
         const searchResults = await youtube.search(query);
         
@@ -37,16 +32,11 @@ export default {
 
       if (url.pathname === '/stream') {
         const videoId = url.searchParams.get('id');
-        if (!videoId) {
-          return new Response(JSON.stringify({ ok: false, error: 'Video ID missing' }), {
-            status: 400,
-            headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-          });
-        }
+        if (!videoId) return new Response(JSON.stringify({ ok: false, error: 'Video ID missing' }), { status: 400 });
 
         let streamUrl = '';
         
-        // Coba ambil stream via API publik eksternal yang stabil
+        // Paling aman: Langsung tembak API Piped untuk stream supaya Cloudflare gak usah decrypt cipher YouTube
         try {
           const res = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
           if (res.ok) {
@@ -54,19 +44,12 @@ export default {
             const fmt = (data.videoStreams || []).find(f => f.quality === '360p' && !f.videoOnly) || data.videoStreams?.[0];
             if (fmt && fmt.url) streamUrl = fmt.url;
           }
-        } catch (_e) {}
-
-        // Fallback jika API publik gagal: gunakan youtubei.js langsung
-        if (!streamUrl) {
-          try {
-            const info = await youtube.getBasicInfo(videoId);
-            const format = info.chooseFormat({ type: 'video', quality: '360p', format: 'any' });
-            if (format && format.url) streamUrl = format.url;
-          } catch (_e2) {}
+        } catch (e) {
+           console.log("Piped API gagal:", e);
         }
 
         if (!streamUrl) {
-          return new Response(JSON.stringify({ ok: false, error: 'Gagal mendapatkan URL stream video' }), {
+          return new Response(JSON.stringify({ ok: false, error: 'Stream URL tidak ditemukan (API Piped gagal)' }), {
             status: 500,
             headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
           });
@@ -77,14 +60,10 @@ export default {
         });
       }
 
-      return new Response(JSON.stringify({ ok: false, error: 'Endpoint tidak ditemukan' }), {
-        status: 404,
-        headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-      });
+      return new Response(JSON.stringify({ ok: false, error: 'Not Found' }), { status: 404 });
 
     } catch (err) {
-      // Tangkap total semua error dan paksa balas dalam format JSON
-      return new Response(JSON.stringify({ ok: false, error: err.message || 'Internal Server Error' }), {
+      return new Response(JSON.stringify({ ok: false, error: err.message }), {
         status: 500,
         headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
