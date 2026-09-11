@@ -30,14 +30,14 @@ const $=id=>document.getElementById(id), video=$('ytplayer');
 let results=[], currentIndex=-1, desiredQuality=360, qualities=[360,144,240,360,480], speedIndex=0, speeds=[1,1.25,1.5,1.75,2], autoNext=true, searching=false, loadingPlay=false;
 const api = (p) => fetch(p, { cache: 'no-store' }).then(async (r) => {
   const text = await r.text();
+  let j;
   try {
-    const j = JSON.parse(text);
-    if (!r.ok || j.ok === false) throw Error(j.error || ('HTTP ' + r.status));
-    return j;
+    j = JSON.parse(text);
   } catch (e) {
-    // Kalau gagal parse JSON (berarti dapat HTML error), lempar pesan yang rapi
-    throw Error("Server sibuk atau diblokir. Coba lagi nanti.");
+    throw Error("Server Cloudflare Crash/HTML");
   }
+  if (!r.ok || j.ok === false) throw Error(j.error || ('HTTP ' + r.status));
+  return j;
 });
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmt(t){t=Number(t)||0;let m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+String(s).padStart(2,'0');}

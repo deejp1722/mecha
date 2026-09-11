@@ -1,5 +1,26 @@
 import html from './indddex.html';
 
+// 4 Server Piped publik gasan backup (anti-mati)
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de',
+  'https://pipedapi.smnz.de',
+  'https://pipedapi.moomoo.me'
+];
+
+// Fungsi cerdas: Coba satu-satu sampai ada yang berhasil
+async function fetchPiped(path) {
+  for (const baseUrl of PIPED_INSTANCES) {
+    try {
+      const res = await fetch(`${baseUrl}${path}`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      continue; // Lompat ke server berikutnya amun gagal
+    }
+  }
+  throw new Error('Semua server Piped sedang down/sibuk.');
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -9,30 +30,21 @@ export default {
     }
 
     try {
-      // 1. Endpoint Search menggunakan Piped API
       if (url.pathname === '/search') {
         const query = url.searchParams.get('q') || 'Nogizaka46';
         
-        const res = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`);
-        if (!res.ok) throw new Error('API Pencarian sedang sibuk, coba sesaat lagi.');
-        
-        const data = await res.json();
+        // Panggil fungsi cerdas multi-server
+        const data = await fetchPiped(`/search?q=${encodeURIComponent(query)}&filter=videos`);
         
         const items = (data.items || []).map(v => {
           const vidId = v.url.split('?v=')[1] || v.url.split('/').pop();
-          
-          // Format detik ke menit:detik
           const sec = v.duration || 0;
-          const mins = Math.floor(sec / 60);
-          const secs = sec % 60;
-          const durationText = `${mins}:${secs.toString().padStart(2, '0')}`;
-
           return {
             id: vidId,
             title: v.title,
             channel: v.uploaderName,
             thumbnail: v.thumbnail || `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`,
-            duration: durationText
+            duration: `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, '0')}`
           };
         }).filter(v => v.id);
 
@@ -41,20 +53,14 @@ export default {
         });
       }
 
-      // 2. Endpoint Stream menggunakan Piped API
       if (url.pathname === '/stream') {
         const videoId = url.searchParams.get('id');
-        if (!videoId) return new Response(JSON.stringify({ ok: false, error: 'Video ID missing' }), { status: 400 });
+        if (!videoId) throw new Error('Video ID missing');
 
-        const res = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
-        if (!res.ok) throw new Error('API Stream sedang sibuk');
-        
-        const data = await res.json();
+        const data = await fetchPiped(`/streams/${videoId}`);
         const fmt = (data.videoStreams || []).find(f => f.quality === '360p' && !f.videoOnly) || data.videoStreams?.[0];
         
-        if (!fmt || !fmt.url) {
-          throw new Error('Stream URL tidak ditemukan');
-        }
+        if (!fmt || !fmt.url) throw new Error('Stream URL tidak ketemu bro');
 
         return new Response(JSON.stringify({ ok: true, url: fmt.url }), {
           headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
