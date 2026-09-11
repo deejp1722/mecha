@@ -1,0 +1,12 @@
+{
+  "name": "mecha-youtubejs-extractor-v21-3",
+  "version": "21.3.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

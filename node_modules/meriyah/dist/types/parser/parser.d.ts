@@ -1,0 +1,60 @@
+import { AssignmentTargetKind, DestructuringKind, Flags, type Location } from '../common.ts';
+import { Errors } from '../errors.ts';
+import type * as ESTree from '../estree.ts';
+import { Features } from '../features.ts';
+import { type InternalOptions, type NormalizedOptions } from '../options.ts';
+import { Token } from '../token.ts';
+import { PrivateScope } from './private-scope.ts';
+import { Scope, type ScopeKind } from './scope.ts';
+export declare class Parser {
+    readonly source: string;
+    private lastOnToken;
+    options: NormalizedOptions;
+    token: Token;
+    flags: Flags;
+    features: Features;
+    index: number;
+    line: number;
+    column: number;
+    startIndex: number;
+    end: number;
+    tokenIndex: number;
+    startColumn: number;
+    tokenColumn: number;
+    tokenLine: number;
+    startLine: number;
+    tokenValue: any;
+    tokenRaw: string;
+    tokenRegExp: void | {
+        pattern: string;
+        flags: string;
+    };
+    currentChar: number;
+    exportedNames: Set<string>;
+    exportedBindings: Set<string>;
+    assignable: AssignmentTargetKind;
+    destructible: DestructuringKind;
+    strictReservedRange: [Location, Location] | null;
+    firstAwaitLocation: {
+        start: Location;
+        end: Location;
+    } | null;
+    leadingDecorators: {
+        start?: Location;
+        decorators: ESTree.Decorator[];
+    };
+    constructor(source: string, rawOptions?: InternalOptions);
+    getToken(): Token;
+    setToken(value: Token, replaceLast?: boolean): Token;
+    get tokenStart(): Location;
+    get currentLocation(): Location;
+    finishNode<T extends ESTree.Node>(node: T, start: Location, end: Location | void): T;
+    addBindingToExports(name: string): void;
+    declareUnboundVariable(name: string): void;
+    report(type: Errors, ...params: string[]): never;
+    createScopeIfLexical(type?: ScopeKind, parent?: Scope): Scope | undefined;
+    createScope(type?: ScopeKind, parent?: Scope): Scope;
+    createPrivateScopeIfLexical(parent?: PrivateScope): PrivateScope | undefined;
+    cloneIdentifier(original: ESTree.Identifier): ESTree.Identifier;
+    cloneStringLiteral(original: ESTree.StringLiteral): ESTree.StringLiteral;
+}
