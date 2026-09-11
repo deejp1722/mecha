@@ -1,4 +1,3 @@
-import { Innertube } from 'youtubei.js';
 import html from './indddex.html';
 
 export default {
@@ -10,52 +9,53 @@ export default {
     }
 
     try {
+      // 1. Endpoint Pencarian via Piped API
       if (url.pathname === '/search') {
-        // Buat instance baru untuk setiap request agar tidak ada cache macet
-        const youtube = await Innertube.create({ fetch: (input, init) => fetch(input, init) });
-        
         const query = url.searchParams.get('q') || 'Nogizaka46';
-        const searchResults = await youtube.search(query);
         
-        const items = (searchResults.results || []).map(v => ({
-          id: v.id,
-          title: v.title?.text || v.title,
-          channel: v.author?.name || v.author,
-          thumbnail: v.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
-          duration: v.duration?.text || ''
-        })).filter(v => v.id);
+        const res = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=all`);
+        if (!res.ok) throw new Error('API Pencarian sedang gangguan');
+        
+        const data = await res.json();
+        
+        const items = (data.items || [])
+          .filter(v => v.type === 'stream') // Ambil video saja
+          .map(v => {
+            // Format durasi dari detik ke format MM:SS
+            const d = Number(v.duration);
+            const m = Math.floor(d / 60);
+            const s = Math.floor(d % 60).toString().padStart(2, '0');
+            
+            return {
+              id: v.url.replace('/watch?v=', ''),
+              title: v.title,
+              channel: v.uploaderName,
+              thumbnail: v.thumbnail,
+              duration: d > 0 ? `${m}:${s}` : ''
+            };
+          });
 
         return new Response(JSON.stringify({ ok: true, items }), {
           headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         });
       }
 
+      // 2. Endpoint Stream via Piped API
       if (url.pathname === '/stream') {
         const videoId = url.searchParams.get('id');
         if (!videoId) return new Response(JSON.stringify({ ok: false, error: 'Video ID missing' }), { status: 400 });
 
-        let streamUrl = '';
+        const res = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
+        if (!res.ok) throw new Error('API Stream sedang gangguan');
         
-        // Paling aman: Langsung tembak API Piped untuk stream supaya Cloudflare gak usah decrypt cipher YouTube
-        try {
-          const res = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
-          if (res.ok) {
-            const data = await res.json();
-            const fmt = (data.videoStreams || []).find(f => f.quality === '360p' && !f.videoOnly) || data.videoStreams?.[0];
-            if (fmt && fmt.url) streamUrl = fmt.url;
-          }
-        } catch (e) {
-           console.log("Piped API gagal:", e);
+        const data = await res.json();
+        const fmt = (data.videoStreams || []).find(f => f.quality === '360p' && !f.videoOnly) || data.videoStreams?.[0];
+        
+        if (!fmt || !fmt.url) {
+          throw new Error('Stream URL tidak ditemukan');
         }
 
-        if (!streamUrl) {
-          return new Response(JSON.stringify({ ok: false, error: 'Stream URL tidak ditemukan (API Piped gagal)' }), {
-            status: 500,
-            headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-          });
-        }
-
-        return new Response(JSON.stringify({ ok: true, url: streamUrl }), {
+        return new Response(JSON.stringify({ ok: true, url: fmt.url }), {
           headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
       }
