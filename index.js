@@ -5,7 +5,6 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // 1. Tampilkan UI HTML di halaman depan
     if (url.pathname === '/') {
       return new Response(html, {
         headers: { 'content-type': 'text/html;charset=UTF-8' },
@@ -17,7 +16,6 @@ export default {
         fetch: (input, init) => fetch(input, init)
       });
 
-      // 2. Endpoint Pencarian (/search)
       if (url.pathname === '/search') {
         const query = url.searchParams.get('q') || 'Nogizaka46';
         const searchResults = await youtube.search(query);
@@ -28,17 +26,13 @@ export default {
           channel: v.author?.name,
           thumbnail: v.thumbnails?.[0]?.url,
           duration: v.duration?.text
-        }));
+        })).filter(v => v.id);
 
         return new Response(JSON.stringify({ ok: true, items }), {
-          headers: { 
-            'content-type': 'application/json',
-            'Access-Control-Allow-Origin': '*' 
-          },
+          headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         });
       }
 
-      // 3. Endpoint Streaming (/stream) - Mengambil format video aktif
       if (url.pathname === '/stream') {
         const videoId = url.searchParams.get('id');
         if (!videoId) {
@@ -49,13 +43,11 @@ export default {
         }
 
         const info = await youtube.getBasicInfo(videoId);
-        const format = info.chooseFormat({ type: 'video', quality: '360p', format: 'any' });
+        // Coba ambil format muxed mp4 atau format apa saja yang tersedia
+        const format = info.chooseFormat({ type: 'video', quality: 'any', format: 'any' });
 
         return new Response(JSON.stringify({ ok: true, url: format.url }), {
-          headers: { 
-            'content-type': 'application/json',
-            'Access-Control-Allow-Origin': '*' 
-          },
+          headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         });
       }
 
