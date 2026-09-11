@@ -13,7 +13,6 @@ export default {
     }
 
     try {
-      // Inisialisasi YouTubei dengan binding fetch worker aman
       const youtube = await Innertube.create({
         fetch: (input, init) => fetch(input, init)
       });
@@ -23,7 +22,6 @@ export default {
         const query = url.searchParams.get('q') || 'Nogizaka46';
         const searchResults = await youtube.search(query);
         
-        // Format hasil supaya sesuai dengan format yang diminta frontend
         const items = searchResults.results.map(v => ({
           id: v.id,
           title: v.title?.text,
@@ -40,22 +38,33 @@ export default {
         });
       }
 
-      // 3. Endpoint Streaming (/stream) - Kerangka Awal
+      // 3. Endpoint Streaming (/stream) - Mengambil format video aktif
       if (url.pathname === '/stream') {
         const videoId = url.searchParams.get('id');
-        return new Response(JSON.stringify({ error: "Stream endpoint belum selesai dibuat" }), { 
-          status: 501, 
-          headers: { 'content-type': 'application/json' } 
+        if (!videoId) {
+          return new Response(JSON.stringify({ ok: false, error: 'Video ID missing' }), {
+            status: 400,
+            headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
+        }
+
+        const info = await youtube.getBasicInfo(videoId);
+        const format = info.chooseFormat({ type: 'video', quality: '360p', format: 'any' });
+
+        return new Response(JSON.stringify({ ok: true, url: format.url }), {
+          headers: { 
+            'content-type': 'application/json',
+            'Access-Control-Allow-Origin': '*' 
+          },
         });
       }
 
-      // Jika URL sembarangan diakses
       return new Response('Not Found', { status: 404 });
 
     } catch (err) {
       return new Response(JSON.stringify({ ok: false, error: err.message }), {
         status: 500,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
   },
