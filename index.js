@@ -13,8 +13,10 @@ export default {
     }
 
     try {
-      // Inisialisasi YouTubei (bisa memakan waktu sedikit)
-      const youtube = await Innertube.create();
+      // Inisialisasi YouTubei dengan binding fetch worker aman
+      const youtube = await Innertube.create({
+        fetch: (input, init) => fetch(input, init)
+      });
 
       // 2. Endpoint Pencarian (/search)
       if (url.pathname === '/search') {
@@ -41,7 +43,6 @@ export default {
       // 3. Endpoint Streaming (/stream) - Kerangka Awal
       if (url.pathname === '/stream') {
         const videoId = url.searchParams.get('id');
-        // TODO: Logika proxy stream youtubei.js akan diletakkan di sini
         return new Response(JSON.stringify({ error: "Stream endpoint belum selesai dibuat" }), { 
           status: 501, 
           headers: { 'content-type': 'application/json' } 
