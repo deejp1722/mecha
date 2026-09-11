@@ -43,41 +43,24 @@ export default {
           });
         }
 
-        // Coba ambil info video menggunakan youtubei.js dengan aman
-        let streamUrl = '';
-        try {
-          const info = await youtube.getBasicInfo(videoId);
-          const format = info.chooseFormat({ type: 'video', quality: '360p', format: 'any' });
-          streamUrl = format.url;
-        } catch (innerErr) {
-          // Fallback cerdas: Jika youtubei.js diblokir, ambil langsung dari redirect publik
-          streamUrl = `https://piped.video/latest_version?id=${videoId}&itag=18`;
-        }
+        // Ambil URL stream publik langsung dari Piped/Invidious API publik agar Cloudflare tidak terblokir
+        const streamResp = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
+        const streamData = await streamResp.json();
+        
+        // Cari format video mp4 kualitas 360p atau yang tersedia
+        const formats = streamData.videoStreams || [];
+        const selectedFormat = formats.find(f => f.quality === '360p' && f.videoOnly === false) || formats[0];
 
-        if (!streamUrl) {
-          return new Response(JSON.stringify({ ok: false, error: 'Stream URL tidak ditemukan' }), {
+        if (!selectedFormat || !selectedFormat.url) {
+          return new Response(JSON.stringify({ ok: false, error: 'Gagal mengambil stream video' }), {
             status: 500,
             headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
           });
         }
 
-        const range = request.headers.get('range') || '';
-        const fetchHeaders = range ? { Range: range } : {};
-
-        const ytResponse = await fetch(streamUrl, {
-          headers: fetchHeaders,
-          method: 'GET',
-          redirect: 'follow'
-        });
-
-        const resHeaders = new Headers(ytResponse.headers);
-        resHeaders.set('Access-Control-Allow-Origin', '*');
-        resHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        resHeaders.set('Cache-Control', 'no-store');
-
-        return new Response(ytResponse.body, {
-          status: ytResponse.status,
-          headers: resHeaders
+        // Kirimkan URL stream sebagai JSON ke frontend supaya video player bisa langsung memutarnya
+        return new Response(JSON.stringify({ ok: true, url: selectedFormat.url }), {
+          headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
       }
 
