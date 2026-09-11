@@ -34,11 +34,13 @@ export default {
         });
       }
 
-      // Endpoint Proxy Stream sejati (meneruskan Range request ke Google Video)
       if (url.pathname === '/stream') {
         const videoId = url.searchParams.get('id');
         if (!videoId) {
-          return new Response('Video ID missing', { status: 400 });
+          return new Response(JSON.stringify({ ok: false, error: 'Video ID missing' }), {
+            status: 400,
+            headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
         }
 
         const info = await youtube.getBasicInfo(videoId);
@@ -52,10 +54,12 @@ export default {
         }
 
         if (!streamUrl) {
-          return new Response('Gagal mendapatkan URL stream', { status: 500 });
+          return new Response(JSON.stringify({ ok: false, error: 'Gagal mendapatkan URL stream' }), {
+            status: 500,
+            headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
         }
 
-        // Ambil header Range dari browser client supaya scrubbing/seek video lancar
         const range = request.headers.get('range') || '';
         const fetchHeaders = range ? { Range: range } : {};
 
@@ -64,7 +68,6 @@ export default {
           method: 'GET'
         });
 
-        // Teruskan respons stream langsung ke frontend browser dengan CORS penuh
         const resHeaders = new Headers(ytResponse.headers);
         resHeaders.set('Access-Control-Allow-Origin', '*');
         resHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
